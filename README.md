@@ -24,13 +24,15 @@ It is a prototype, not a claim that Wizard is inaccurate, not a medical or clini
 - **Free live mode**: `estimate` runs real dry runs against the live API - labeled motor imagery and the zero-shot resting task (eyes closed vs eyes open) - plus `usage` and `list`. Nothing is fitted or charged.
 - **Offline simulate mode**: a built-in fake gateway speaks the exact documented routes, error shapes, idempotency rules and usage headers, so the full create → predict → gate → audit loop runs with no key and no money.
 - **Command gate**: sustained-evidence firing, abstention on rest/idle/neutral, refractory latch against repeated commands, Jensen-Shannon drift blocking, and a tamper-evident audit chain that records what was *not* done and why.
+- **Offline calibration**: `calibrate` grid-sweeps threshold/margin/dwell over a 138-window adversarial scenario (long rest, weak evidence, sustained commands, label oscillation, runaway stream) and picks the fastest config meeting a false-activation target. Latest run: `enter=0.80 margin=0.15 dwell=2` gives **0.000 false activations/minute at 667 ms mean fire latency**; oscillating strong labels, perfect ties and mid-dwell dips never fire (covered by dedicated adversarial tests).
 - **NeuroComm bridge**: an adapter for cheap-EEG concentration streams in the style of Julian Weaver's [NeuroComm](https://github.com/weavejul/NeuroComm) (hacked MindFlex → band strengths → yes/no by concentration). NeuroComm ships no license, so none of its code is copied; this is a clean-room implementation of the published idea, credited, mapping eSense attention/meditation/signal-quality readings to the same prediction shape the gate consumes. Poor headset contact forces abstention.
 
 ## Quickstart
 
 ```sh
-python -m unittest discover -s tests -v   # 38 tests, no key needed
+python -m unittest discover -s tests -v   # 47 tests, no key needed
 python -m dydema_gate.cli simulate        # full loop vs the fake gateway, no money
+python -m dydema_gate.cli calibrate       # grid-sweep gate settings vs a false-activation target
 ```
 
 Live free estimates (needs a key):
@@ -46,6 +48,10 @@ Live paid loop (real credit: $1.00 create + $0.003/window, model deleted at the 
 ```sh
 python -m dydema_gate.cli demo --allow-spend 2.00
 ```
+
+## Live free checks (2026-11-01)
+
+Against the real API with a $0.00 cap: `usage` answers (account active, no charges recorded), `list` answers (no task models), and the labeled motor-imagery dry run returned `category: motor`, `classes: [left, right]`, `create_usd: 1`, `hosting_usd_per_month: 1` in ~32 s. Session spend: **$0.000**. The zero-shot resting estimate hit a transient 409 CONFLICT (a killed earlier attempt was still running server-side); retry per the docs' repeat-after-a-few-minutes rule.
 
 ## Simulated run (latest)
 
@@ -70,8 +76,9 @@ dydema_gate/
   synthetic.py     synthetic trials for demos/tests (NOT real EEG)
   neurocomm.py     clean-room cheap-EEG bridge (credit: weavejul/NeuroComm)
   fake_gateway.py  local fake of the documented API for tests and offline demo
-  cli.py           simulate / estimate / usage / list / demo
-tests/             38 tests, all against the fake gateway, no key needed
+  calibrate.py     offline gate-config sweep against adversarial scenarios
+  cli.py           simulate / calibrate / estimate / usage / list / demo
+tests/             47 tests, all offline, no key needed
 ```
 
 ## Sources

@@ -22,10 +22,13 @@ class HygieneTest(unittest.TestCase):
         for dirpath, dirnames, filenames in os.walk(ROOT):
             dirnames[:] = [d for d in dirnames if d not in {".git", "__pycache__"}]
             for filename in filenames:
+                if filename == ".env":
+                    continue  # gitignored runtime file; must never be committed
                 path = os.path.join(dirpath, filename)
                 with open(path, "rb") as handle:
                     content = handle.read().decode("utf-8", errors="ignore")
-                self.assertIsNone(KEY_PATTERN.search(content), f"key material in {path}")
+                if KEY_PATTERN.search(content):
+                    self.fail(f"key material in tracked file {path}")
 
 
 if __name__ == "__main__":

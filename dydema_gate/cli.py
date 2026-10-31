@@ -21,7 +21,7 @@ from .dotenv import load_env
 from .errors import DydemaError, SpendRefused
 from .fake_gateway import FakeGateway
 from .gate import GateConfig, IdleGate
-from . import neurocomm, synthetic
+from . import calibrate, neurocomm, synthetic
 
 WINDOW_MS = 250
 
@@ -117,6 +117,30 @@ def cmd_simulate(_args) -> int:
     return 0
 
 
+def cmd_calibrate(args) -> int:
+    """Offline grid sweep: pick gate settings for a false-activation target."""
+    results = calibrate.sweep(target_false_per_minute=args.target)
+    best = calibrate.pick(results, target_false_per_minute=args.target)
+    print(f"scenario: {results[0].windows} deterministic windows "
+          f"(rest, weak, sustained, oscillating, runaway)")
+    print(f"target: <= {args.target} false activations/minute\n")
+    for r in sorted(results, key=lambda r: (r.false_activations_per_minute,
+                                            r.mean_fire_latency_ms or 1e9))[:8]:
+        c = r.config
+        latency = f"{r.mean_fire_latency_ms:.0f} ms" if r.mean_fire_latency_ms is not None else "never fires"
+        print(f"  enter={c.enter_probability:.2f} margin={c.min_margin:.2f} dwell={c.dwell_windows}  "
+              f"false/min={r.false_activations_per_minute:.3f} latency={latency} "
+              f"fired={r.fired} missed={r.missed_commands} blocked={r.blocked_windows}")
+    if best is None:
+        print("\nNo config met the target without missing commands.")
+        return 1
+    c = best.config
+    print(f"\npicked: enter={c.enter_probability:.2f} margin={c.min_margin:.2f} "
+          f"dwell={c.dwell_windows} -> {best.false_activations_per_minute:.3f} false/min, "
+          f"{best.mean_fire_latency_ms:.0f} ms mean latency")
+    return 0
+
+
 def cmd_estimate(_args) -> int:
     """Live FREE dry runs only. Nothing is fitted or charged."""
     client = _live_client(Budget())  # $0.00 cap; estimates are free
@@ -169,6 +193,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="dydema_gate")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("simulate", help="offline full loop vs the fake gateway (no key, no money)")
+    cal = sub.add_parser("calibrate", help="offline gate-config sweep vs a false-activation target")
+    cal.add_argument("--target", type=float, default=0.2, help="max false activations per minute")
     sub.add_parser("estimate", help="live FREE dry-run estimates only")
     sub.add_parser("usage", help="live free usage read")
     sub.add_parser("list", help="live free task-model list")
@@ -176,7 +202,7 @@ def main(argv: list[str] | None = None) -> int:
     demo.add_argument("--allow-spend", type=float, default=0.0,
                       help="USD cap for this run; 0 (default) refuses to run")
     args = parser.parse_args(argv)
-    handlers = {"simulate": cmd_simulate, "estimate": cmd_estimate,
+    handlers = {"simulate": cmd_simulate, "calibrate": cmd_calibrate, "estimate": cmd_estimate,
                 "usage": cmd_usage, "list": cmd_list, "demo": cmd_demo}
     try:
         return handlers[args.command](args)
